@@ -1,0 +1,122 @@
+---
+title: "NYC Accidents 2020"
+author: "Alan Norberto"
+date: "2025-12-04"
+output: html_document
+---
+
+```{r load_packages, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(knitr)
+library(ggplot2)
+```
+
+Begin analysis. 
+Disclaimer: Data source and questions are from Maven Analytics.
+
+```{r import_clean_dataframe, include=FALSE}
+nyc_accidents_2020 <- read_csv("clean_nyc_accidents_2020.csv")
+```
+
+Cleaned dataset below.
+
+```{r}
+glimpse(nyc_accidents_2020)
+```
+
+
+#### Question 1: Compare the % of total accidents by month. Do you notice any seasonal patterns?
+
+```{r}
+accidents_by_month <- nyc_accidents_2020 %>%
+  mutate(month = month(crash_date, label = TRUE)) %>%
+  count(month, name = "num_of_accidents") %>%
+  mutate(percent = num_of_accidents / sum(num_of_accidents) * 100)
+
+kable(accidents_by_month)
+
+ggplot(accidents_by_month, aes(x = month, y = num_of_accidents)) + geom_col(fill = "navy") +
+  labs(title = "Accidents by Month", x = "Month", y = "Total Accidents") +
+  theme_minimal()
+```
+
+
+#### Question 2: Break down accident frequency by day of week and hour of day. Based on this data, when do accidents occur most frequently?
+
+```{r}
+accidents_per_day <- nyc_accidents_2020 %>% 
+       mutate(week_days = wday(crash_date, label = TRUE)) %>%
+       count(week_days, name = "num_of_accidents")
+
+kable(accidents_per_day)
+
+ggplot(accidents_per_day, aes(x = week_days, y = num_of_accidents)) + geom_col(fill = "navy") + 
+  labs(title = "Accidents Per Day", x = "Day", y = "Total Accidents") + 
+  theme_minimal()
+
+
+accidents_by_day_and_hour <- nyc_accidents_2020 %>%
+  mutate(week_days = wday(crash_date, label = TRUE),
+         crash_hour = hour(hms(crash_time))  ## Extract hour from HH:MM:SS
+  ) %>%
+  count(week_days, crash_hour, name = "num_of_accidents")
+
+
+ggplot(accidents_by_day_and_hour, aes(x = crash_hour, y = week_days, fill = num_of_accidents)) +
+  geom_tile() +
+  scale_x_continuous(breaks = 0:23) +
+  labs(title = "Accidents by Hour and Day",
+       x = "Hour",
+       y = "Day of Week",
+       fill = "Accidents") +
+  theme_minimal()
+```
+
+
+#### Question 3: On which particular street were the most accidents reported? What does that represent as a % of all reported accidents?
+
+```{r}
+accidents_by_street_10 <- nyc_accidents_2020 %>%
+       count(on_street_name, name = "num_of_accidents") %>%
+       arrange(desc(num_of_accidents)) %>%
+        slice_head(n = 10)
+
+ggplot(accidents_by_street_10, aes(x = on_street_name, y = num_of_accidents)) +
+  geom_col(fill = "navy") +
+  coord_flip() + ## This flips the bar chart to the side for better readability
+  labs(title = "Accidents by Street", x = "Street Name", y = "Total Accidents") +
+  theme_minimal()
+
+```
+
+
+#### Questions 4: What was the most common contributing factor for the accidents reported in this sample (based on Vehicle 1)? 
+
+```{r}
+common_contributing_factors <- nyc_accidents_2020 %>% 
+  count(contributing_factor_vehicle_1, name = "num_of_accidents") %>% 
+  arrange(desc(num_of_accidents))
+
+ggplot(common_contributing_factors, aes(x = contributing_factor_vehicle_1, y = num_of_accidents)) +
+  geom_col(fill = "navy") +
+  coord_flip() +
+  labs(title = "Common Contributing Factors", x = "Reason", y="Total Accidents") +
+  theme_minimal()
+```
+
+
+#### Question 5: How many fatal accidents were there?
+
+```{r}
+total_fatalities <- nyc_accidents_2020 %>%
+  mutate(total_fatalities = number_of_persons_killed +
+           number_of_pedestrians_killed +
+           number_of_cyclist_killed +
+           number_of_motorist_killed) %>%
+  summarise(all_fatalities = sum(total_fatalities, na.rm = TRUE))
+
+kable(total_fatalities)
+```
+
+
